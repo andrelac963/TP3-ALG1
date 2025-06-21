@@ -1,33 +1,62 @@
-#include "../include/board.hpp"
-#include "../include/exact_solver.hpp"
-#include "../include/greedy_solver.hpp"
 #include <iostream>
-#include <chrono>
+#include <string>
+#include "Board.hpp"
+#include "ExactSolver.hpp"
+#include "ApproxSolver.hpp"
+#include "Timer.hpp"
 
-int main()
+// Modo VPL: imprime só a solução exata.
+// Com --verbose ou -v: imprime também solução aprox. e tempos+iterações.
+int main(int argc, char *argv[])
 {
-    int n, m, k;
-    std::cin >> n >> m >> k;
+    bool verbose = false;
+    if (argc > 1)
+    {
+        std::string a = argv[1];
+        if (a == "--verbose" || a == "-v")
+            verbose = true;
+    }
 
-    Board board(n, m);
-    board.load_board();
+    // 1) Leitura e pré-processamento
+    Board board;
+    board.read(std::cin);
+    board.computeDistances();
 
-    auto start_exact = std::chrono::high_resolution_clock::now();
-    int exact_result = ExactSolver::solve(board);
-    auto end_exact = std::chrono::high_resolution_clock::now();
+    const int INF = 1000000000;
+    // Se algum peão for inacessível, retorna -1 direto
+    for (int j = 1; j <= board.K; ++j)
+    {
+        if (board.dist[0][j] >= INF)
+        {
+            std::cout << -1 << "\n";
+            return 0;
+        }
+    }
 
-    auto start_greedy = std::chrono::high_resolution_clock::now();
-    int greedy_result = GreedySolver::solve(board);
-    auto end_greedy = std::chrono::high_resolution_clock::now();
+    // 2) Solução exata
+    Timer t1;
+    t1.start();
+    ExactSolver exact(board.dist);
+    int ansEx = exact.solve();
+    double timeEx = t1.elapsed();
+    long long iterEx = exact.getIterationCount();
+    std::cout << ansEx << "\n";
 
-    std::cout << "Exact Result: " << exact_result << "\n";
-    std::cout << "Greedy Result: " << greedy_result << "\n";
+    // 3) (opcional) Solução aproximada + estatísticas
+    if (verbose)
+    {
+        Timer t2;
+        t2.start();
+        ApproxSolver approx(board.dist);
+        int ansAp = approx.solve();
+        double timeAp = t2.elapsed();
+        long long iterAp = approx.getIterationCount();
 
-    std::chrono::duration<double> exact_time = end_exact - start_exact;
-    std::chrono::duration<double> greedy_time = end_greedy - start_greedy;
-
-    std::cout << "Exact Time: " << exact_time.count() << " seconds\n";
-    std::cout << "Greedy Time: " << greedy_time.count() << " seconds\n";
+        std::cout
+            << ansAp << "\n"
+            << "Exact time:   " << timeEx << " ms, iterations: " << iterEx << "\n"
+            << "Approx time:  " << timeAp << " ms, iterations: " << iterAp << "\n";
+    }
 
     return 0;
 }
